@@ -5,6 +5,7 @@ Les fonctions presentes sont:
 - copulaCreation qui va creer la copule pour X
 - distributionCreation qui va creer les distributions de X
 - la fonction f, permettant d'obtenir la variable Y a partir du vecteur aleatoire X
+- getConditional
 """
 
 from openturns import *
@@ -38,4 +39,11 @@ def distributionCreation(situation):
 
 
 f = NumericalMathFunction(["Q","K","Zm","Zv"], ["y"], ["Zv + (Q/(K*10*sqrt((Zm-Zv)/100)))^(3.0/5.0)"])
+
+def getConditional(X,Y):
+	Xout = []
+	for i in range(len(Y)):
+		if (Y[i][0] > 58.):
+			Xout.append(X[i])
+	return(NumericalSample(np.array(Xout)))
 			

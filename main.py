@@ -16,7 +16,6 @@ distributions = distributionCreation(situation)
 
 #Creation de X
 X = RandomVector(ComposedDistribution(distributions,copula))
-print(X.getMarginal(1))
 
 #Moyennes et Variances des loies marginales
 for i in range(len(distributions)):
@@ -69,3 +68,37 @@ View(graph)
 
 #Creation de l'evenement redoute:
 fearedEvent = Event(Y,Greater(),58.)
+
+
+#Estimation de la probilite:
+#Methode de Monte-Carlo:
+monte_carlo = MonteCarlo(fearedEvent)
+monte_carlo.setMaximumOuterSampling(100)
+monte_carlo.setBlockSize(100)
+monte_carlo.setMaximumCoefficientOfVariation(0.1)
+Log.Show(Log.INFO)
+f.enableHistory()
+monte_carlo.run()
+resultMC = monte_carlo.getResult()
+print("L'estimation est: %",resultMC.getProbabilityEstimate())
+
+
+#Estimation de la densite de probabilite de X conditionne a E:
+#Par defaut, le noyau utilise est une loi normale N(0,1)
+#TODO: tester d'autres noyaux, faire un beau graph
+Xi = f.getHistoryInput().getSample()
+Yeval = f.getHistoryOutput().getSample()
+Xcond = getConditional(Xi,Yeval)
+kernel = KernelSmoothing()
+fittedX = kernel.build(Xcond)
+
+
+#Methode d'importance sampling
+importance = ImportanceSampling(fearedEvent,fittedX)
+importance.setMaximumOuterSampling(100)
+importance.setBlockSize(100)
+importance.setMaximumCoefficientOfVariation(0.1)
+Log.Show(Log.INFO)
+importance.run()
+resultIS = importance.getResult()
+print("L'estimation est: %",resultIS.getProbabilityEstimate())
