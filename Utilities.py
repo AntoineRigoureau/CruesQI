@@ -33,27 +33,9 @@ def distributionCreation(situation):
 	K = TruncatedDistribution(Normal(30,7.5),0,TruncatedDistribution.LOWER)
 	Zv = Triangular(49,50,51)
 	Zm = Triangular(54,55,56)
-	return([Q,K,Zv,Zm])
+	return([Q,K,Zm,Zv])
 
 
 
-def f(X,L,B):
-	Y = (X.getMarginal(3) - X.getMarginal(2))/L
-	Y.sqrt()
-	Y = ProductDistribution(Y, X.getMarginal(1)*B)
-	inv = NumericalMathFunction('x','1.0/x')
-	b0 = Y.getRange().getLowerBound()
-	bN = Y.getRange().getUpperBound()
-	a = [b0[0],bN[0]]
-	g = [SpecFunc.MaxNumericalScalar, inv(bN)[0]]
-	Y = CompositeDistribution(inv,Y,a,g)
-	Y = ProductDistribution(Y,X.getMarginal(0))
-	a0 = Y.getRange().getLowerBound()
-	aN = Y.getRange().getUpperBound()
-	puiss = NumericalMathFunction('x','x^(3./5.)')
-	a = [a0[0],aN[0]]
-	g = [puiss(a0)[0], puiss(aN)[0]]
-	Y = CompositeDistribution(puiss,Y,a,g)
-	return(Y)
-	
+f = NumericalMathFunction(["Q","K","Zm","Zv"], ["y"], ["Zv + (Q/(K*10*sqrt((Zm-Zv)/100)))^(3.0/5.0)"])
 			
