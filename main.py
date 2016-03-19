@@ -11,11 +11,12 @@ from openturns.viewer import View
 copula = copulaCreation()
 
 #Creation des distributions de X
-situation = 3
+situation = 2
 distributions = distributionCreation(situation)
 
 #Creation de X
-X = RandomVector(ComposedDistribution(distributions,copula))
+DX = ComposedDistribution(distributions,copula)
+X = RandomVector(DX)
 
 #Moyennes et Variances des loies marginales
 for i in range(len(distributions)):
@@ -69,12 +70,12 @@ View(graph)
 #Creation de l'evenement redoute:
 fearedEvent = Event(Y,Greater(),58.)
 
-
+"""
 #Estimation de la probilite:
 #Methode de Monte-Carlo:
 monte_carlo = MonteCarlo(fearedEvent)
-monte_carlo.setMaximumOuterSampling(100)
-monte_carlo.setBlockSize(100)
+monte_carlo.setMaximumOuterSampling(1000)
+monte_carlo.setBlockSize(10)
 monte_carlo.setMaximumCoefficientOfVariation(0.1)
 Log.Show(Log.INFO)
 f.enableHistory()
@@ -102,3 +103,70 @@ Log.Show(Log.INFO)
 importance.run()
 resultIS = importance.getResult()
 print("L'estimation est: %",resultIS.getProbabilityEstimate())
+
+"""
+#Approxiamtion de modeles:
+#creation d'une base de polynomes:
+d = 4
+p = 3
+DZ = ComposedDistribution(distributions)
+enumerateFunction = LinearEnumerateFunction(d)
+H = [StandardDistributionPolynomialFactory(AdaptiveStieltjesAlgorithm(DZ.getMarginal(i))) for i in range(d)]
+productBasis = OrthogonalProductPolynomialFactory(H,LinearEnumerateFunction(d))
+m = enumerateFunction.getStrataCumulatedCardinal(p)
+print(m)
+
+#Approximation par la methode LASSO avec LARS leave-one-out:
+algoSelection = LeastSquaresMetaModelSelectionFactory(LAR(),CorrectedLeaveOneOut())
+n = 1000
+Xsample = DZ.getSample(n)
+Ysample = f(Xsample)
+fCCompute = FunctionalChaosAlgorithm(Xsample,Ysample,DZ,FixedStrategy(productBasis,m),LeastSquaresStrategy(algoSelection))
+fCCompute.run()
+fCFResult = fCCompute.getResult()
+fC = fCFResult.getMetaModel()
+
+
+YC = RandomVector(fC,X)
+fearedEventBis = Event(YC,Greater(),58.)
+"""
+#Monte-Carlo applique a fC:
+#Ici, comme il s'agit d'un modele d'approximation, on n'a pas de contraintes de calcul donc on peut faire beaucoup d'evaluations
+monte_carloBis = MonteCarlo(fearedEventBis)
+monte_carloBis.setMaximumOuterSampling(10000)
+monte_carloBis.setBlockSize(1000)
+monte_carloBis.setMaximumCoefficientOfVariation(0.01)
+Log.Show(Log.INFO)
+fC.enableHistory()
+monte_carloBis.run()
+resultMCBis = monte_carloBis.getResult()
+print("L'estimation est: %",resultMCBis.getProbabilityEstimate())
+
+#Utilisation de variables de controle:
+
+
+control = ControlVariableVarianceReduction(fearedEventBis,YC,Y,58.0)
+control.setIterationNumber(10000)
+control.setBlockNumber(1000)
+control.setMaximumCoefficientOfVariation(0.01,0.01)
+control.run()
+"""
+
+#Analyse de sensibilite
+sobol = FunctionalChaosRandomVector(fCFResult)
+for i in range(4):
+    print("Sobol {0} = {1}".format(i,sobol.getSobolIndex(i)))
+    print("Sobol Total {0} = {1}".format( i, sobol.getSobolTotalIndex(i)))
+
+#Estimation de l'esperence conditionelle a E chapeau:
+k = 10000
+conditionedSample = getConditional(X.getSample(k),YC.getSample(k))
+conditionedMean = conditionedSample.computeMean()
+print(fC(conditionedMean))
+
+#On analyse la sensibilite en utilisant un algo FORM
+#L'esperence estimee est utilisee comme point de depart
+algo = AbdoRackwitz()
+formAlgo = FORM(algo,fearedEventBis,conditionedMean)
+formResults = formAlgo.run()
+importance = formResults.getResult().getImportanceFactors()
